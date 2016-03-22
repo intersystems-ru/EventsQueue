@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="EventsQueue.Manager">
+<Description>
+Class for representing the queue manager based on the mechanism of %SYSTEM.Events
+Set of class method for manipulating the queue (start,stop) and queue's agents</Description>
+<Super>%RegisteredObject</Super>
+<TimeCreated>63999,46034.313358</TimeCreated>
+
+<Method name="Start">
+<Description>
+Starts the queue
+pResource - name for events to wait for. Some sort of the name for a queue.
+pAgents - number of queue agents to start.
+pClass and pMethod - name of the class and classmethod to launch when a new event happens in the queue. </Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%String,pAgents:%Integer=1,pClass:%String,pMethod:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		// trying to create a resource
+		set created = $system.Event.Create(pResource)
+		if (created = 0) {
+			$$$ThrowStatus($$$ERROR("Resource already exists!"))
+		}
+		$$$TOE(st, ..StartAgents(pResource, pAgents, pClass, pMethod))
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Method name="Stop">
+<Description>
+Stops the queue with the "name" pResource and kills all the agents that are waiting for events pResource.</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		set deleted = $system.Event.Delete(pResource)
+		if ('deleted) $$$ThrowStatus($$$ERROR(-1, "Resource was not deleted!"))
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Method name="StartAgents">
+<Description>
+Internal method for launching agents in the loop
+Was made for convenience duting the development</Description>
+<Internal>1</Internal>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%String,pAgents:%Integer,pClass:%String,pMethod:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		for i = 1:1:pAgents {
+			job ..RunAgent(pResource, pClass, pMethod):():1
+		}
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Method name="RunAgent">
+<Description>
+The main working classmethod for agent which is launched as a background job
+Has an infinite loop for waiting events in the queue. When the event has happened, the following classmethod is launched.</Description>
+<Internal>1</Internal>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%String,pClass:%String,pMethod:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		do ##class(Agent).%New(pResource)
+		for {
+			set wait = $system.Event.WaitMsg(pResource)
+			set code = $LG(wait,1)
+			set msg = $LG(wait,2)
+			if (code = 1) {
+				try {
+					$$$TOE(st, $classmethod(pClass, pMethod, msg))
+				} catch ex1 {
+					do ##class(Log).Add(4, $system.Status.GetErrorText(ex1.AsStatus()))
+				}
+			} elseif (code = -1) {
+				do ##class(Log).Add(2, "Wait status = -1. Killing agent...")
+				$$$TOE(st, ..KillAgent($j))
+				quit
+			}
+		}
+	} catch ex {
+		set st = ex.AsStatus()
+		do ##class(Log).Add(8, $system.Status.GetErrorText(st))
+		do ..KillAgent($j)
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Method name="GetAgentCount">
+<Description>
+Gets the number of agents registered in the class Agent.</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%String,*pStatus:%Status</FormalSpec>
+<ReturnType>%Integer</ReturnType>
+<Implementation><![CDATA[
+	set pStatus = $$$OK
+	&sql(SELECT COUNT(*) INTO :count FROM isc_util_queue.Agent WHERE Resource = :pResource)
+	if (SQLCODE < 0) {
+		set pStatus = $$$ERROR(SQLCODE, %msg)
+		quit -1
+	} else {
+		quit count
+	}
+]]></Implementation>
+</Method>
+
+<Method name="KillAgent">
+<Description>
+Kills agent by process id</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pid:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		if (pid '= $j) {
+			set terminated = $system.Process.Terminate(pid)
+			if ((terminated = 1) || (terminated = -2) || (terminated = -3)) $$$TOE(st, ##class(Agent).%DeleteId(pid))
+		} else {
+			$$$TOE(st, ##class(Agent).%DeleteId(pid))
+		}
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Method name="KillAllAgents">
+<Description>
+Kills all the agents for the specific queue with name of events = pResource</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResource:%Status</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		set sql = "SELECT Pid FROM isc_util_queue.Agent WHERE Resource = '"_pResource_"'"
+		set statement = ##class(%SQL.Statement).%New()
+		$$$TOE(st, statement.%Prepare(sql))
+		
+		s resultSet = statement.%Execute()
+		i (resultSet.%SQLCODE < 0) 		$$$ThrowStatus($$$ERR(resultSet.%SQLCODE_" "_resultSet.%Message))
+		i (resultSet.%SQLCODE = 100) 	quit
+		
+		while (resultSet.%Next()) {
+			set pid = resultSet.%Get("Pid")
+			$$$TOE(st, ..KillAgent(pid))
+		}
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+</Class>
+</Export>

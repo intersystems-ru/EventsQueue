@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="EventsQueue.Agent">
+<Description>
+Agent class for processing queue</Description>
+<Super>%Persistent</Super>
+<TimeCreated>63999,45487.438815</TimeCreated>
+
+<Index name="IDKEY">
+<IdKey>1</IdKey>
+<PrimaryKey>1</PrimaryKey>
+<Properties>Pid</Properties>
+<Unique>1</Unique>
+</Index>
+
+<Property name="Pid">
+<Description>
+Process ID</Description>
+<Type>%String</Type>
+</Property>
+
+<Property name="Resource">
+<Description>
+ResourceName for the event that process is waiting for</Description>
+<Type>%String</Type>
+</Property>
+
+<Property name="TSStart">
+<Description>
+Timestamp of the start</Description>
+<Type>%TimeStamp</Type>
+<InitialExpression>$ZDT($NOW(),3,1,3)</InitialExpression>
+</Property>
+
+<Method name="%OnNew">
+<Description><![CDATA[
+This callback method is invoked by the <METHOD>%New</METHOD> method to 
+provide notification that a new instance of an object is being created.
+
+<P>If this method returns an error then the object will not be created.
+<p>It is passed the arguments provided in the %New call.
+When customizing this method, override the arguments with whatever variables and types you expect to receive from %New().
+For example, if you're going to call %New, passing 2 arguments, %OnNew's signature could be:
+<p>Method %OnNew(dob as %Date = "", name as %Name = "") as %Status
+If instead of returning a %Status code this returns an oref and this oref is a subclass of the current
+class then this oref will be the one returned to the caller of %New method.]]></Description>
+<FormalSpec>pResource:%String=""</FormalSpec>
+<Private>1</Private>
+<ReturnType>%Status</ReturnType>
+<ServerOnly>1</ServerOnly>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		if (pResource = "") $$$ThrowStatus($$$ERROR("pResource parameter can't be undefined!"))
+		
+		set ..Pid = $J
+		set ..Resource = pResource
+		$$$TOE(st, ..%Save(0))
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^EventsQueue.AgentD</DataLocation>
+<DefaultData>AgentDefaultData</DefaultData>
+<IdLocation>^EventsQueue.AgentD</IdLocation>
+<IndexLocation>^EventsQueue.AgentI</IndexLocation>
+<StreamLocation>^EventsQueue.AgentS</StreamLocation>
+<Data name="AgentDefaultData">
+<Structure>listnode</Structure>
+<Subscript/>
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>Resource</Value>
+</Value>
+<Value name="3">
+<Value>TSStart</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+</Export>

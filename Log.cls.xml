@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="EventsQueue.Log">
+<Description>
+Log class for queue manager</Description>
+<Super>%Persistent</Super>
+<TimeCreated>63999,45523.243658</TimeCreated>
+
+<Property name="TS">
+<Description>
+Event timestamp</Description>
+<Type>%TimeStamp</Type>
+<InitialExpression>$ZDT($NOW(),3,1,3)</InitialExpression>
+</Property>
+
+<Property name="Pid">
+<Description>
+Agent's Process ID</Description>
+<Type>%String</Type>
+</Property>
+
+<Property name="LogLevel">
+<Description>
+Log level</Description>
+<Type>%String</Type>
+<InitialExpression>2</InitialExpression>
+<Parameter name="DISPLAYLIST" value=",Debug,Info,Warn,Error"/>
+<Parameter name="VALUELIST" value=",1,2,4,8"/>
+</Property>
+
+<Property name="Message">
+<Description>
+Event message</Description>
+<Type>%String</Type>
+<Parameter name="MAXLEN"/>
+</Property>
+
+<Method name="Add">
+<Description>
+Add a record to log with level = pLevel and message = pMsg</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pLevel:%String,pMsg:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	set st = $$$OK
+	try {
+		set line = ..%New()
+		set line.LogLevel = pLevel
+		set line.Pid = $j
+		set line.Message = pMsg
+
+		$$$TOE(st, line.%Save(0))
+	} catch ex {
+		set st = ex.AsStatus()
+	}
+	quit st
+]]></Implementation>
+</Method>
+</Class>
+</Export>
